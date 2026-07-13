@@ -67,7 +67,7 @@ Quando a saída é polar, o tensor é rotacionado para as direções radial e ci
 
 ### 3.2 Compilação
 ```bash
-gfortran -std=legacy -o MEF-grupo07 MEF-grupo07.f
+gfortran -std=legacy -o mef MEF-grupo07.f
 ```
 
 Para as malhas mais refinadas (estudo de convergência), pode ser preciso aumentar o parâmetro `npos` no início do arquivo — ele define o tamanho do vetor de trabalho. Se aparecer a mensagem de memória insuficiente, é esse valor que precisa crescer.
@@ -77,7 +77,7 @@ Para as malhas mais refinadas (estudo de convergência), pode ser preciso aument
 O programa pede três nomes de arquivo, em ordem: dados de entrada, saída em texto e saída em VTK.
 
 ```bash
-./MEF-grupo07
+./mef
 ```
 ```
 Arquivo de dados: Exemplo_1.1.dat
