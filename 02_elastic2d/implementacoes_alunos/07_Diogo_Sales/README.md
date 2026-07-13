@@ -10,7 +10,7 @@ Esta implementação estende o programa base de MEF elástico 2D (elementos T3 e
 
 O programa original só aceitava forças concentradas aplicadas diretamente nos nós. Cargas reais, no entanto, costumam ser distribuídas ao longo de uma superfície ou aresta, exemplo, pressão de um fluido. Para incorporar esse tipo de carregamento, foi necessário converter a pressão, informada ao longo de uma aresta do contorno, em um par de forças nodais **equivalentes**, aplicadas nos dois nós daquela aresta.
 
-Além disso, o programa de referência resolvia o sistema $[K]\{U\}=\{F\}$ e escrevia os deslocamentos, mas não calculava as tensões resultantes nem exportava nenhum resultado por elemento para visualização gráfica. Foi implementada uma rotina de pós-processamento que recupera a tensão ($\sigma_x, \sigma_y, \tau_{xy}$) em cada elemento a partir do campo de deslocamentos resolvido, e o resultado foi exportado no formato VTK (`CELL_DATA`) para visualização direta no ParaView.
+Além disso, o programa de referência resolvia o sistema $[K]\{U\}=\{F\}$ e escrevia os deslocamentos, mas não calculava as tensões resultantes nem exportava nenhum resultado por elemento para visualização gráfica. Foi implementada uma rotina de pós-processamento que recupera a tensão ($\sigma_x, \sigma_y, \tau_{xy}, \sigma_z$) em cada elemento a partir do campo de deslocamentos resolvido, e o resultado foi exportado no formato VTK (`CELL_DATA`) para visualização direta no ParaView.
 
 Nenhuma rotina do núcleo do programa de referência (elementos `elmt01`–`elmt04`, montagem `pform`/`addstf`, solver PCG) foi alterada — a implementação estende o programa por fora, reaproveitando essas peças já validadas.
 
