@@ -106,7 +106,7 @@ Os nós vão na ordem anti-horária do contorno; pressão de compressão entra n
 
 2. **Exemplos** — pressão em duas faces perpendiculares.
 
-3. **Cilindro de Lamé** — quarto de anel ($a=1$, $b=2$) sob pressão interna, comparado com a solução analítica. O Q4 reproduz $\sigma_r$ e $\sigma_\theta$ com erro da ordem de 0,1%; o T3 fica na faixa esperada para um elemento de deformação constante. Refinando a malha, o erro cai de forma ordenada (ordem $\approx 2$ para o Q4), confirmando a convergência para a solução exata.
+3. **Cilindro de Lamé** — quarto de anel ($a=1$, $b=2$) sob pressão interna, comparado com a solução analítica e Teste de Convergência do Redino da Malha com a solução analítica
 
 **Todos os Exemplos feitos estão na Pasta Exemplos**
 
