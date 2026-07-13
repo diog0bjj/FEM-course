@@ -102,46 +102,27 @@ Os nós vão na ordem anti-horária do contorno; pressão de compressão entra n
 
 ## 4. Exemplo
 
-`caso1_uniaxial.dat` — patch test uniaxial:
+1. **Exemplo 1** — pressão em uma única face. $\sigma_x = 100$ exato em todos os elementos, $\sigma_y \approx \tau_{xy} \approx 0$. 
 
-- Malha retangular 2,0 × 1,0 (T3, estado plano de tensão), 15 nós, 16 elementos.
-- Apoio tipo rolete na face esquerda (nós 1, 6, 11 com $u_x=0$; o nó 1 também com $u_y=0$, apenas para eliminar movimento de corpo rígido sem restringir o efeito de Poisson).
-- Pressão $p=100$ (tração) aplicada na face direita, arestas 5→10 e 10→15.
+2. **Exemplos** — pressão em duas faces perpendiculares. $\sigma_x = \sigma_y = 100$ exato, $\tau_{xy} \approx 0$. Valida a soma das contribuições de arestas diferentes que compartilham um nó.
 
-**Trecho do `.dat`:**
-```
- 5   10   100.00
-10   15   100.00
- 0    0     0.0
-```
+3. **Cilindro de Lamé** — quarto de anel ($a=1$, $b=2$) sob pressão interna, comparado com a solução analítica. O Q4 reproduz $\sigma_r$ e $\sigma_\theta$ com erro da ordem de 0,1%; o T3 fica na faixa esperada para um elemento de deformação constante. Refinando a malha, o erro cai de forma ordenada (ordem $\approx 2$ para o Q4), confirmando a convergência para a solução exata.
 
-**Resultado** (idêntico nos 16 elementos):
-
-| Campo | Esperado | Obtido |
-|---|---|---|
-| $\sigma_x$ | 100,0 | 100,0 |
-| $\sigma_y$ | 0 | ≈ 0 |
-| $\tau_{xy}$ | 0 | ≈ 0 |
-
-Abrindo o `.vtk` no ParaView e colorindo por `sigma_x` (`CELL_DATA`), a peça aparece com cor uniforme — confirmando o campo de tensão constante.
+**Todos os Exemplos feitos estão na Pasta Exemplos""
 
 ---
 
 ## 5. Verificação
 
-A implementação foi testada em três casos de exigência crescente:
+A implementação foi testada de duas formas
 
-1. **Patch test uniaxial** — pressão em uma única face. $\sigma_x = 100$ exato em todos os elementos, $\sigma_y \approx \tau_{xy} \approx 0$. Valida a conversão de pressão em força nodal equivalente.
-
-2. **Patch test biaxial** — pressão em duas faces perpendiculares. $\sigma_x = \sigma_y = 100$ exato, $\tau_{xy} \approx 0$. Valida a soma das contribuições de arestas diferentes que compartilham um nó.
-
-3. **Cilindro de Lamé** — quarto de anel ($a=1$, $b=2$) sob pressão interna, comparado com a solução analítica. O Q4 reproduz $\sigma_r$ e $\sigma_\theta$ com erro da ordem de 0,1%; o T3 fica na faixa esperada para um elemento de deformação constante. Refinando a malha, o erro cai de forma ordenada (ordem $\approx 2$ para o Q4), confirmando a convergência para a solução exata.
-
-Após cada alteração do código, os resultados foram comparados com a versão anterior para garantir que nada quebrava antes de seguir em frente.
+1. ROBOT (Exemplo 1 e 2) - Software já consolidado
+2. Solução de Lamé para cilíndros de paredes grossas(Exemplo 3) - Solução Analítica 
 
 ---
 
 ## 6. Referências
 
 - Notas de Aula do Prof. Fernando L. B. Ribeiro — *Introdução ao Método dos Elementos Finitos*.
+- Prof. Arthur Braga - Resistência dos Materiais II [PUC-RIO] - *Cilindros de Paredes Grossas (Solução de Lamé)*
 - Documentação do formato VTK legado (ASCII), para a estrutura dos blocos `POINTS`, `CELLS`, `CELL_TYPES` e `CELL_DATA`.
