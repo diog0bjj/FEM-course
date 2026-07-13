@@ -6,124 +6,123 @@
 
 ## 1. Descrição
 
-Esta implementação estende o programa base de MEF elástico 2D (elementos T3 e Q4, estado plano de tensão/deformação) com duas funcionalidades que não existiam no código de referência: **aplicação de pressão distribuída no contorno** e **cálculo/exportação de tensões por elemento**.
+Este trabalho estende o programa base de MEF elástico 2D (elementos T3 e Q4, estado plano de tensão e de deformação) com dois recursos que não existiam no código de referência: aplicação de **pressão distribuída no contorno** e **cálculo e exportação das tensões por elemento**.
 
-O programa original só aceitava forças concentradas aplicadas diretamente nos nós. Cargas reais, no entanto, costumam ser distribuídas ao longo de uma superfície ou aresta, exemplo, pressão de um fluido. Para incorporar esse tipo de carregamento, foi necessário converter a pressão, informada ao longo de uma aresta do contorno, em um par de forças nodais **equivalentes**, aplicadas nos dois nós daquela aresta.
+O programa original só aceitava forças concentradas nos nós. Como cargas reais costumam ser distribuídas ao longo de uma aresta (a pressão de um fluido, por exemplo), foi preciso converter essa pressão em forças nodais **equivalentes**, aplicadas nos dois nós da aresta carregada.
 
-Além disso, o programa de referência resolvia o sistema $[K]\{U\}=\{F\}$ e escrevia os deslocamentos, mas não calculava as tensões resultantes nem exportava nenhum resultado por elemento para visualização gráfica. Foi implementada uma rotina de pós-processamento que recupera a tensão ($\sigma_x, \sigma_y, \tau_{xy}, \sigma_z$) em cada elemento a partir do campo de deslocamentos resolvido, e o resultado foi exportado no formato VTK (`CELL_DATA`) para visualização direta no ParaView.
+Além disso, o código de referência resolvia $[K]\{U\}=\{F\}$ e escrevia apenas os deslocamentos — não calculava as tensões nem exportava resultados por elemento. Implementamos uma rotina de pós-processamento que recupera a tensão em cada elemento a partir do campo de deslocamentos, com saída em coordenadas cartesianas ($\sigma_x, \sigma_y, \tau_{xy}, \sigma_z$) ou polares ($\sigma_r, \sigma_\theta, \tau_{r\theta}, \sigma_z$), escolhidas por uma identificador no arquivo de entrada. O resultado é gravado em formato VTK (`CELL_DATA`) para visualização direta no ParaView.
 
-Nenhuma rotina do núcleo do programa de referência (elementos `elmt01`–`elmt04`, montagem `pform`/`addstf`, solver PCG) foi alterada — a implementação estende o programa por fora, reaproveitando essas peças já validadas.
+As rotinas de cálculo do núcleo (elementos `elmt01`–`elmt04`, montagem `pform`/`addstf`, solver PCG) não foram alteradas. As mudanças ficaram nas rotinas de leitura e saída (`rdata`, `wvtk`), estendidas para os novos recursos, e nas rotinas novas de carga distribuída e de recuperação de tensões.
 
 ---
 
-## 2. Formulação teórica
+## 2. Formulação
 
 ### 2.1 Forças nodais equivalentes a uma pressão de borda
 
-Para uma aresta linear de 2 nós $(n_i, n_j)$, com pressão uniforme $p$, a força nodal equivalente em cada nó é dada pelo princípio dos trabalhos virtuais:
+Para uma aresta linear de 2 nós $(n_i, n_j)$ com pressão uniforme $p$, a força equivalente em cada nó vem do princípio dos trabalhos virtuais:
 
-$$F_a = \int_{\Gamma} N_a(\xi)\cdot t \; d\Gamma, \qquad a = 1,2$$
+$$F_a = \int_{\Gamma} N_a(\xi)\, t \; d\Gamma, \qquad a = 1,2$$
 
-onde $N_1(\xi) = \dfrac{1-\xi}{2}$ e $N_2(\xi) = \dfrac{1+\xi}{2}$ são as funções de forma lineares da aresta ($\xi \in [-1,1]$), e $t = p\cdot n$ é o vetor de tração — a pressão escalar multiplicada pela normal unitária que aponta para fora do domínio:
+com $N_1(\xi) = \dfrac{1-\xi}{2}$, $N_2(\xi) = \dfrac{1+\xi}{2}$ e $t = p\, n$, onde $n$ é a normal unitária externa à aresta:
 
 $$n = \frac{(dy,\, -dx)}{L}, \qquad (dx,dy) = (x_j,y_j) - (x_i,y_i)$$
 
-A normal só aponta corretamente para fora se os nós forem informados na ordem **anti-horária** do contorno (convenção: o sólido fica sempre à esquerda de quem caminha de $n_i$ para $n_j$).
+A tração $t = p\,n$ é um vetor, então a força em cada nó também tem componentes em $x$ e $y$. A normal só aponta para fora se os nós forem informados na ordem **anti-horária** do contorno (o sólido fica sempre à esquerda de quem caminha de $n_i$ para $n_j$). Uma pressão que comprime a face entra com sinal negativo.
 
-A integral é resolvida numericamente por **quadratura de Gauss de 2 pontos**:
-
-$$\xi_{1,2} = \mp\frac{1}{\sqrt3}, \qquad w_{1,2} = 1$$
-
-Como o integrando ($N_a \cdot t$) é de grau 1, a quadratura de 2 pontos é **exata** — o resultado coincide com a fórmula fechada clássica $F = p\cdot L/2$ em cada nó, mas obtido de forma explícita a partir das funções de forma, o que permite generalizar facilmente para pressão variável ao longo da aresta (bastaria interpolar $p(\xi) = N_1 p_1 + N_2 p_2$).
+A integral é resolvida por **quadratura de Gauss de 2 pontos** ($\xi = \mp 1/\sqrt3$, pesos iguais a 1). Como o integrando ($N_a \cdot t$) é de grau 1, a quadratura é exata e reproduz o resultado clássico $F = p\,L/2$ em cada nó — mas obtido a partir das funções de forma, o que deixa a rotina pronta para o caso de pressão variável ao longo da aresta.
 
 ### 2.2 Cálculo de tensões
 
-A partir do campo de deslocamentos $u$ resolvido pelo solver, a deformação em cada elemento é obtida por:
+A deformação em cada elemento é obtida das derivadas das funções de forma aplicadas aos deslocamentos nodais ($\varepsilon = B\, u_e$):
 
 $$\varepsilon_{xx} = \frac{\partial u_x}{\partial x}, \qquad
 \varepsilon_{yy} = \frac{\partial u_y}{\partial y}, \qquad
 \gamma_{xy} = \frac{\partial u_y}{\partial x} + \frac{\partial u_x}{\partial y}$$
 
-calculadas via as derivadas das funções de forma do próprio elemento (matriz $B$: $\varepsilon = B\, u_e$). Para o T3 (deformação constante), essas derivadas são avaliadas uma única vez por elemento; para o Q4, são avaliadas no centro do elemento ($r=s=0$, equivalente a um único ponto de Gauss), produzindo um valor representativo de tensão por elemento.
+No T3 (deformação constante) essas derivadas são avaliadas uma única vez por elemento. No Q4 elas variam dentro do elemento, então são avaliadas no centro ($r=s=0$, equivalente a um ponto de Gauss), produzindo um valor representativo de tensão por elemento.
 
-A tensão é obtida pela lei de Hooke generalizada, $\sigma = D\varepsilon$, com a matriz constitutiva $D$ dependendo do estado plano considerado:
+A tensão vem da lei de Hooke, $\sigma = D\,\varepsilon$, com a matriz $D$ dependendo do estado plano:
+
+**Estado plano de tensão (EPT):**
+
+$$D = \frac{E}{1-\nu^2}
+\begin{bmatrix} 1 & \nu & 0 \\ \nu & 1 & 0 \\ 0 & 0 & \frac{1-\nu}{2} \end{bmatrix},
+\qquad \sigma_z = 0$$
+
+**Estado plano de deformação (EPD):**
+
+$$D = \frac{E}{(1+\nu)(1-2\nu)}
+\begin{bmatrix} 1-\nu & \nu & 0 \\ \nu & 1-\nu & 0 \\ 0 & 0 & \frac{1-2\nu}{2} \end{bmatrix},
+\qquad \sigma_z = \nu(\sigma_x + \sigma_y)$$
+
+Quando a saída é polar, o tensor é rotacionado para as direções radial e circunferencial pelo ângulo do centroide do elemento. Isso permite comparar diretamente $\sigma_r$ e $\sigma_\theta$ com a solução de Lamé.
 
 ---
 
 ## 3. Como compilar e rodar
 
 ### 3.1 Pré-requisitos
-- `gfortran` (compilador Fortran, suporta a sintaxe legada usada no arquivo)
+- `gfortran` (o código usa sintaxe Fortran legada)
 
 ### 3.2 Compilação
 ```bash
-gfortran -o mef Mef-Entrega.f
+gfortran -std=legacy -o mef MEF-grupo07.f
 ```
+
+Para as malhas mais refinadas (estudo de convergência), pode ser preciso aumentar o parâmetro `npos` no início do arquivo — ele define o tamanho do vetor de trabalho. Se aparecer a mensagem de memória insuficiente, é esse valor que precisa crescer.
 
 ### 3.3 Execução
 
-O programa pede três nomes de arquivo, em ordem: dados de entrada, saída em texto, saída em VTK.
+O programa pede três nomes de arquivo, em ordem: dados de entrada, saída em texto e saída em VTK.
 
-**Interativo:**
 ```bash
 ./mef
 ```
 ```
-Arquivo de dados: caso1_uniaxial.dat
+Arquivo de dados: Exemplo_1.1.dat
 Arquivo de saida: saida1.txt
-Arquivo VTK de saida (ex: resultado.vtk): caso1.vtk
+Arquivo VTK de saida: resultado.vtk
 ```
 
-### 3.3 Formato do bloco de pressão no arquivo `.dat`
+### 3.4 Formato do arquivo `.dat`
 
-Após as seções de condições de contorno e forças concentradas (já existentes no formato original), o novo bloco de pressão segue o formato:
+A primeira linha traz os parâmetros da malha e termina com a flag `isai`, que define o sistema de saída (1 = cartesiano, 2 = polar):
+```
+nnode numel numat nen ndf ndm isai
+```
+
+O bloco de pressão vem depois das condições de contorno e das forças concentradas, uma linha por aresta carregada, terminando com o sentinela `0 0 0.0`:
 ```
 ni   nj   p
 ```
-uma linha por aresta carregada, terminando com o sentinela `0 0 0.0`. Os nós devem ser informados na ordem anti-horária do contorno.
+Os nós vão na ordem anti-horária do contorno; pressão de compressão entra negativa.
 
 ---
 
 ## 4. Exemplo
 
-Caso de teste `caso1_uniaxial.dat` — patch test uniaxial:
+1. **Exemplo 1** — pressão em uma única face. $\sigma_x = 100$ exato em todos os elementos, $\sigma_y \approx \tau_{xy} \approx 0$. 
 
-- Malha retangular 2,0 × 1,0 (T3, Estado Plano de Tensão), 15 nós, 16 elementos.
-- Apoio tipo rolete na face esquerda (nós 1, 6, 11 com $u_x=0$; nó 1 também com $u_y=0$ para eliminar movimento de corpo rígido, sem restringir o efeito de Poisson).
-- Pressão $p=100$ aplicada na face direita (arestas 5→10 e 10→15).
+2. **Exemplos** — pressão em duas faces perpendiculares.
 
-**Trecho relevante do `.dat`:**
-```
- 5   10   100.00
-10   15   100.00
- 0    0     0.0
-```
+3. **Cilindro de Lamé** — quarto de anel ($a=1$, $b=2$) sob pressão interna, comparado com a solução analítica e Teste de Convergência do Redino da Malha com a solução analítica
 
-**Resultado obtido** (idêntico em todos os 16 elementos):
-
-| Campo | Esperado | Obtido |
-|---|---|---|
-| $\sigma_x$ | 100,0 | 100,0 (exato) |
-| $\sigma_y$ | 0 | ≈ 0 (ruído numérico ~1e-6) |
-| $\tau_{xy}$ | 0 | ≈ 0 (ruído numérico ~1e-6) |
-
-O resultado é visualizável abrindo o `caso1.vtk` gerado no ParaView e colorindo por `sigma_x` (`CELL_DATA`) — a peça inteira aparece com uma única cor, confirmando o campo de tensão uniforme.
+**Todos os Exemplos feitos estão na Pasta Exemplos**
 
 ---
 
 ## 5. Verificação
 
-A implementação foi validada em três níveis crescentes de exigência, além de dois testes de robustez de entrada:
+A implementação foi testada de duas formas
 
-1. **Patch test uniaxial** (`caso1_uniaxial.dat`) — pressão em uma única face. Resultado: $\sigma_x=100{,}0$ exato em todos os elementos, $\sigma_y\approx\tau_{xy}\approx 0$. Valida a conversão básica de pressão em força nodal equivalente.
-
-2. **Patch test biaxial** (`caso2_biaxial.dat`) — pressão simultânea em duas faces perpendiculares. Resultado: $\sigma_x=\sigma_y=100{,}0$ exato, $\tau_{xy}\approx 0$. Valida a superposição de contribuições de arestas diferentes no mesmo nó (acumulação `+=` em `edgfor`).
-
-Após cada alteração incremental do código, os resultados foram comparados com a versão anterior para confirmar que permaneciam idênticos (mesma norma de energia, mesmas tensões) antes de prosseguir — prática de não regressão.
+1. ROBOT (Exemplo 1 e 2) - Software já consolidado
+2. Solução de Lamé para cilíndros de paredes grossas(Exemplo 3) - Solução Analítica 
 
 ---
 
 ## 6. Referências
 
-- Notas de Aula do Prof. Fernando L. B. Ribeiro - INTRODUÇÃO AO MÉTODO DOS ELEMENTOS FINITOS
-- Documentação do formato VTK legado (ASCII), para a estrutura dos blocos `POINTS`, `CELLS`, `CELL_TYPES`, `POINT_DATA` e `CELL_DATA`.
+- Notas de Aula do Prof. Fernando L. B. Ribeiro — *Introdução ao Método dos Elementos Finitos*.
+- Prof. Arthur Braga - Resistência dos Materiais II [PUC-RIO] - *Cilindros de Paredes Grossas (Solução de Lamé)*
+- Documentação do formato VTK legado (ASCII), para a estrutura dos blocos `POINTS`, `CELLS`, `CELL_TYPES` e `CELL_DATA`.
